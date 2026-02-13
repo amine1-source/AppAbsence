@@ -1,6 +1,6 @@
 const { useState, useEffect } = React;
 
-// --- 1. ICÔNES ---
+// --- 1. ICÔNES (SVG intégrés) ---
 const Icons = {
     School: () => <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white"><path d="m4 6 8-4 8 4"/><path d="m18 10 4 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8l4-2"/><path d="M14 22v-4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v4"/><path d="M18 5v17"/><path d="M6 5v17"/><circle cx="12" cy="9" r="2"/></svg>,
     User: ({size, className}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
@@ -23,7 +23,7 @@ const Icons = {
 
 // --- 2. CONSTANTES ET CONFIGURATION ---
 const APP_NAME = "Absence Manager";
-const DEVELOPER_CREDIT = "Developed by Amine OUCHKIR";
+const DEVELOPER_CREDIT = "Developed by Pr Amine OUCHKIR";
 const STORAGE_KEYS = {
     USERS: 'am_users',
     CLASSES: 'am_classes',
@@ -165,7 +165,7 @@ const Login = ({ onLogin }) => {
                     </form>
                 </div>
             </div>
-            <div className="mt-8 text-blue-300 text-xs">&copy; {new Date().getFullYear()} Lycée Qualifiant</div>
+            <div className="mt-8 text-blue-300 text-xs">&copy; 2026 - Maroc</div>
         </div>
     );
 };
@@ -361,15 +361,26 @@ const SupervisorDashboard = ({ user, onLogout }) => {
     const [filterClass, setFilterClass] = useState('');
     const [filterDate, setFilterDate] = useState('');
     const [showFilters, setShowFilters] = useState(false);
+    
+    // Etats pour les listes déroulantes
+    const [teachersList, setTeachersList] = useState([]);
+    const [classesList, setClassesList] = useState([]);
 
-    useEffect(() => { loadAbsences(); }, []);
+    useEffect(() => { 
+        loadAbsences(); 
+        // Charger les listes pour les filtres
+        const users = getUsers();
+        setTeachersList(users.filter(u => u.role === UserRole.TEACHER));
+        setClassesList(getClasses());
+    }, []);
+
     useEffect(() => { applyFilters(); }, [absences, filterTeacher, filterClass, filterDate]);
 
     const loadAbsences = () => { setAbsences(getAbsences().reverse()); };
     const applyFilters = () => {
         let result = absences;
-        if (filterTeacher) result = result.filter(a => a.teacherName.toLowerCase().includes(filterTeacher.toLowerCase()));
-        if (filterClass) result = result.filter(a => a.className.toLowerCase().includes(filterClass.toLowerCase()));
+        if (filterTeacher) result = result.filter(a => a.teacherName === filterTeacher);
+        if (filterClass) result = result.filter(a => a.className === filterClass);
         if (filterDate) result = result.filter(a => a.date === filterDate);
         setFilteredAbsences(result);
     };
@@ -393,8 +404,27 @@ const SupervisorDashboard = ({ user, onLogout }) => {
                     <button onClick={() => setShowFilters(!showFilters)} className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between text-gray-700 font-medium hover:bg-gray-100"><div className="flex items-center gap-2"><Icons.Filter size={18} /> Filtrer les résultats</div><span className="text-xs bg-gray-200 px-2 py-1 rounded-full">{showFilters ? 'Masquer' : 'Afficher'}</span></button>
                     {showFilters && (
                         <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 bg-white">
-                            <div><label className="block text-xs font-semibold text-gray-500 mb-1">Professeur</label><div className="relative"><Icons.Search className="absolute left-2 top-2.5 text-gray-400" size={14} /><input type="text" value={filterTeacher} onChange={(e) => setFilterTeacher(e.target.value)} placeholder="Chercher..." className="w-full pl-8 p-2 text-sm border border-gray-300 rounded-lg focus:ring-orange-500" /></div></div>
-                            <div><label className="block text-xs font-semibold text-gray-500 mb-1">Classe</label><input type="text" value={filterClass} onChange={(e) => setFilterClass(e.target.value)} placeholder="ex: 2ème BAC..." className="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-orange-500" /></div>
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-500 mb-1">Professeur</label>
+                                <div className="relative">
+                                    <Icons.Search className="absolute left-2 top-2.5 text-gray-400" size={14} />
+                                    <select value={filterTeacher} onChange={(e) => setFilterTeacher(e.target.value)} className="w-full pl-8 p-2 text-sm border border-gray-300 rounded-lg focus:ring-orange-500 bg-white">
+                                        <option value="">Tous les professeurs</option>
+                                        {teachersList.map(t => (
+                                            <option key={t.id} value={t.fullName}>{t.fullName}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-500 mb-1">Classe</label>
+                                <select value={filterClass} onChange={(e) => setFilterClass(e.target.value)} className="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-orange-500 bg-white">
+                                    <option value="">Toutes les classes</option>
+                                    {classesList.map(c => (
+                                        <option key={c.id} value={c.name}>{c.name}</option>
+                                    ))}
+                                </select>
+                            </div>
                             <div><label className="block text-xs font-semibold text-gray-500 mb-1">Date</label><input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-orange-500" /></div>
                         </div>
                     )}
