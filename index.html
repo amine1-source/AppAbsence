@@ -23,13 +23,18 @@
 
     <!-- Votre fichier CSS -->
     <link rel="stylesheet" href="style.css">
-<script type="importmap">
+
+    <!-- Import Map pour Firebase -->
+    <script type="importmap">
 {
   "imports": {
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js",
+    "firebase/": "https://esm.sh/firebase@^12.9.0/",
+    "react/": "https://esm.sh/react@^19.2.4/",
     "react": "https://esm.sh/react@^19.2.4",
     "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "lucide-react": "https://esm.sh/lucide-react@^0.563.0"
+    "lucide-react": "https://esm.sh/lucide-react@^0.564.0"
   }
 }
 </script>
@@ -37,8 +42,7 @@
 <body>
     <div id="root"></div>
 
-    <!-- Votre fichier JavaScript (Logique de l'application) -->
-    <!-- L'attribut type="text/babel" est crucial pour que Babel fonctionne -->
-    <script type="text/babel" src="script.js"></script>
+    <!-- CORRECTION ICI : Ajout de data-type="module" pour que Firebase fonctionne -->
+    <script type="text/babel" data-type="module" src="script.js"></script>
 </body>
 </html>
