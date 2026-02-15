@@ -9,7 +9,7 @@ import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot
 // (Project Settings -> General -> Your apps -> Config)
 // ---------------------------------------------------------
 const firebaseConfig = {
-    apiKey: "AIzaSyDXveZDB7z31kVANa7_3VwT4JKxuP4L6vg",          // REMPLACEZ CECI
+    apiKey: "AIzaSyDXveZDB7z31kVANa7_3VwT4JKxuP4L6vg",          
     authDomain: "gestionabsences-15d95.firebaseapp.com",
     projectId: "gestionabsences-15d95",
     storageBucket: "gestionabsences-15d95.firebasestorage.app",
