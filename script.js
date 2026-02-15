@@ -1,6 +1,33 @@
 const { useState, useEffect } = React;
+// Import des modules Firebase définis dans l'importmap de index.html
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, getDocs } from "firebase/firestore";
 
-// --- 1. ICÔNES (SVG intégrés) ---
+// --- 1. CONFIGURATION FIREBASE ---
+// ---------------------------------------------------------
+// IMPORTANT : Remplacez les valeurs ci-dessous par celles de votre console Firebase
+// (Project Settings -> General -> Your apps -> Config)
+// ---------------------------------------------------------
+const firebaseConfig = {
+    apiKey: "AIzaSyDXveZDB7z31kVANa7_3VwT4JKxuP4L6vg",          // REMPLACEZ CECI
+    authDomain: "gestionabsences-15d95.firebaseapp.com",
+    projectId: "gestionabsences-15d95",
+    storageBucket: "gestionabsences-15d95.firebasestorage.app",
+    messagingSenderId: "1004883968724",
+    appId: "1:1004883968724:web:d58b5c430cfc9768f97141"
+};
+
+// Initialisation de Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// Références aux collections
+const usersCol = collection(db, 'users');
+const classesCol = collection(db, 'classes');
+const studentsCol = collection(db, 'students');
+const absencesCol = collection(db, 'absences');
+
+// --- 2. ICÔNES (SVG intégrés) ---
 const Icons = {
     School: () => <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white"><path d="m4 6 8-4 8 4"/><path d="m18 10 4 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8l4-2"/><path d="M14 22v-4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v4"/><path d="M18 5v17"/><path d="M6 5v17"/><circle cx="12" cy="9" r="2"/></svg>,
     User: ({size, className}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
@@ -28,15 +55,11 @@ const Icons = {
     X: ({size, className}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
 };
 
-// --- 2. CONSTANTES ET CONFIGURATION ---
+// --- 3. CONSTANTES ET SERVICES (Mise à jour pour Firebase) ---
 const APP_NAME = "Absence Manager";
 const DEVELOPER_CREDIT = "Developed by Pr Amine OUCHKIR";
 const STORAGE_KEYS = {
-    USERS: 'am_users',
-    CLASSES: 'am_classes',
-    STUDENTS: 'am_students',
-    ABSENCES: 'am_absences',
-    CURRENT_USER: 'am_current_user'
+    CURRENT_USER: 'am_current_user' // On garde seulement la session en local
 };
 const UserRole = {
     ADMIN: 'ADMIN',
@@ -44,106 +67,60 @@ const UserRole = {
     SUPERVISOR: 'SURVEILLANT'
 };
 
-// --- 3. SERVICES (Gestion des données) ---
-const initStorage = () => {
-    const users = localStorage.getItem(STORAGE_KEYS.USERS);
-    if (!users) {
-        const defaultAdmin = {
-            id: 'admin-001',
-            username: 'admin',
-            password: 'admin123',
-            role: UserRole.ADMIN,
-            fullName: 'Administrateur Principal'
-        };
-        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify([defaultAdmin]));
+// --- 4. SERVICES DATABASE (Firestore) ---
+
+// Vérifie si l'admin existe, sinon le crée
+const initDefaultAdmin = async () => {
+    try {
+        const q = query(usersCol, where("username", "==", "admin"));
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) {
+            await addDoc(usersCol, {
+                username: 'admin',
+                password: 'admin123',
+                role: UserRole.ADMIN,
+                fullName: 'Administrateur Principal'
+            });
+            console.log("Admin par défaut créé");
+        }
+    } catch (e) {
+        console.error("Erreur init admin:", e);
     }
 };
 
-const getUsers = () => {
-    initStorage();
-    const data = localStorage.getItem(STORAGE_KEYS.USERS);
-    return data ? JSON.parse(data) : [];
-};
+// --- 5. COMPOSANTS (Interface Utilisateur) ---
 
-const addUser = (user) => {
-    const users = getUsers();
-    users.push(user);
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-};
-
-const getClasses = () => {
-    const data = localStorage.getItem(STORAGE_KEYS.CLASSES);
-    return data ? JSON.parse(data) : [];
-};
-
-const addClass = (cls) => {
-    const classes = getClasses();
-    classes.push(cls);
-    localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(classes));
-};
-
-const updateClass = (updatedClass) => {
-    let classes = getClasses();
-    classes = classes.map(c => c.id === updatedClass.id ? updatedClass : c);
-    localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(classes));
-};
-
-const getStudents = () => {
-    const data = localStorage.getItem(STORAGE_KEYS.STUDENTS);
-    return data ? JSON.parse(data) : [];
-};
-
-const addStudent = (student) => {
-    const list = getStudents();
-    list.push(student);
-    localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(list));
-};
-
-const removeStudent = (id) => {
-    let list = getStudents();
-    list = list.filter(s => s.id !== id);
-    localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(list));
-};
-
-const getAbsences = () => {
-    const data = localStorage.getItem(STORAGE_KEYS.ABSENCES);
-    return data ? JSON.parse(data) : [];
-};
-
-const addAbsence = (absence) => {
-    const list = getAbsences();
-    list.push(absence);
-    localStorage.setItem(STORAGE_KEYS.ABSENCES, JSON.stringify(list));
-};
-
-const removeAbsence = (id) => {
-    let list = getAbsences();
-    list = list.filter(a => a.id !== id);
-    localStorage.setItem(STORAGE_KEYS.ABSENCES, JSON.stringify(list));
-};
-
-const clearAllAbsences = () => {
-    localStorage.setItem(STORAGE_KEYS.ABSENCES, JSON.stringify([]));
-};
-
-// --- 4. COMPOSANTS (Interface Utilisateur) ---
-
-// --- Écran de Connexion ---
+// --- Écran de Connexion (Modifié pour Async) ---
 const Login = ({ onLogin }) => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [role, setRole] = useState(UserRole.TEACHER);
     const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    const handleLogin = (e) => {
+    useEffect(() => { initDefaultAdmin(); }, []);
+
+    const handleLogin = async (e) => {
         e.preventDefault();
         setError('');
-        const users = getUsers();
-        const user = users.find(u => u.username === username && u.password === password && u.role === role);
-        if (user) {
-            onLogin(user);
-        } else {
-            setError('Nom d\'utilisateur ou mot de passe incorrect pour ce rôle.');
+        setLoading(true);
+
+        try {
+            // Requête Firestore pour trouver l'utilisateur
+            const q = query(usersCol, where("username", "==", username), where("password", "==", password), where("role", "==", role));
+            const snapshot = await getDocs(q);
+            
+            if (!snapshot.empty) {
+                const userDoc = snapshot.docs[0];
+                onLogin({ id: userDoc.id, ...userDoc.data() });
+            } else {
+                setError('Identifiants incorrects pour ce rôle.');
+            }
+        } catch (err) {
+            console.error(err);
+            setError("Erreur de connexion (Vérifiez votre configuration Firebase).");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -192,7 +169,9 @@ const Login = ({ onLogin }) => {
                             </div>
                         </div>
                         {error && <div className="p-3 bg-red-50 text-red-700 text-sm rounded-lg border border-red-200">{error}</div>}
-                        <button type="submit" className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">Se connecter</button>
+                        <button type="submit" disabled={loading} className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50">
+                            {loading ? 'Chargement...' : 'Se connecter'}
+                        </button>
                     </form>
                 </div>
             </div>
@@ -201,7 +180,7 @@ const Login = ({ onLogin }) => {
     );
 };
 
-// --- Composant Reutilisable : Gestion des classes d'un prof (Ajout/Edition) ---
+// --- Composant Reutilisable : Gestion Classes (Async) ---
 const TeacherClassManager = ({ teacherId, classes, onUpdateClasses }) => {
     const [newClassName, setNewClassName] = useState('');
     const [editingClassId, setEditingClassId] = useState(null);
@@ -209,13 +188,14 @@ const TeacherClassManager = ({ teacherId, classes, onUpdateClasses }) => {
 
     const teacherClasses = classes.filter(c => c.teacherId === teacherId);
 
-    const handleAddClass = (e) => {
+    const handleAddClass = async (e) => {
         e.preventDefault();
         if (!newClassName.trim()) return;
-        const newClass = { id: Date.now().toString(), name: newClassName, teacherId: teacherId };
-        addClass(newClass);
-        setNewClassName('');
-        onUpdateClasses();
+        try {
+            await addDoc(classesCol, { name: newClassName, teacherId: teacherId });
+            setNewClassName('');
+            // Pas besoin de onUpdateClasses car on utilise onSnapshot dans le parent
+        } catch (e) { console.error(e); }
     };
 
     const startEditing = (cls) => {
@@ -223,14 +203,12 @@ const TeacherClassManager = ({ teacherId, classes, onUpdateClasses }) => {
         setEditName(cls.name);
     };
 
-    const saveEdit = (id) => {
+    const saveEdit = async (id) => {
         if (!editName.trim()) return;
-        const cls = teacherClasses.find(c => c.id === id);
-        if (cls) {
-            updateClass({ ...cls, name: editName });
+        try {
+            await updateDoc(doc(db, 'classes', id), { name: editName });
             setEditingClassId(null);
-            onUpdateClasses();
-        }
+        } catch(e) { console.error(e); }
     };
 
     return (
@@ -265,7 +243,7 @@ const TeacherClassManager = ({ teacherId, classes, onUpdateClasses }) => {
 };
 
 
-// --- Dashboard Admin ---
+// --- Dashboard Admin (Async) ---
 const AdminDashboard = ({ user, onLogout }) => {
     const [users, setUsers] = useState([]);
     const [classes, setClasses] = useState([]);
@@ -277,31 +255,39 @@ const AdminDashboard = ({ user, onLogout }) => {
     const [errorMsg, setErrorMsg] = useState('');
     const [expandedTeacherId, setExpandedTeacherId] = useState(null);
 
-    useEffect(() => { refreshList(); }, []);
-    
-    const refreshList = () => { 
-        setUsers(getUsers()); 
-        setClasses(getClasses());
-    };
+    // Écoute temps réel
+    useEffect(() => {
+        const unsubUsers = onSnapshot(usersCol, (snapshot) => {
+            setUsers(snapshot.docs.map(d => ({id: d.id, ...d.data()})));
+        });
+        const unsubClasses = onSnapshot(classesCol, (snapshot) => {
+            setClasses(snapshot.docs.map(d => ({id: d.id, ...d.data()})));
+        });
+        return () => { unsubUsers(); unsubClasses(); };
+    }, []);
 
-    const handleAddUser = (e) => {
+    const handleAddUser = async (e) => {
         e.preventDefault();
         setSuccessMsg(''); setErrorMsg('');
+        
+        // Vérification locale doublon (simplifiée)
         if (users.some(u => u.username === newUsername)) {
             setErrorMsg("Ce nom d'utilisateur existe déjà.");
             return;
         }
-        const newUser = {
-            id: Date.now().toString(),
-            username: newUsername,
-            password: newPassword,
-            fullName: newName,
-            role: newRole
-        };
-        addUser(newUser);
-        refreshList();
-        setSuccessMsg(`Utilisateur ${newUsername} ajouté avec succès.`);
-        setNewUsername(''); setNewPassword(''); setNewName('');
+
+        try {
+            await addDoc(usersCol, {
+                username: newUsername,
+                password: newPassword, // Note: En prod, ne pas stocker en clair
+                fullName: newName,
+                role: newRole
+            });
+            setSuccessMsg(`Utilisateur ${newUsername} ajouté.`);
+            setNewUsername(''); setNewPassword(''); setNewName('');
+        } catch (e) {
+            setErrorMsg("Erreur lors de l'ajout.");
+        }
     };
 
     return (
@@ -310,12 +296,13 @@ const AdminDashboard = ({ user, onLogout }) => {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
                     <div className="flex items-center gap-2">
                         <Icons.ShieldCheck className="text-indigo-600" />
-                        <h1 className="text-xl font-bold text-gray-900">Espace Admin</h1>
+                        <h1 className="text-xl font-bold text-gray-900">Espace Admin (En ligne)</h1>
                     </div>
                     <button onClick={onLogout} className="text-gray-500 hover:text-red-600 transition-colors"><Icons.LogOut size={24} /></button>
                 </div>
             </header>
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+                {/* Formulaire ajout user */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                     <div className="p-6 border-b border-gray-100 bg-gray-50">
                         <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2"><Icons.UserPlus size={20} className="text-indigo-500" /> Ajouter un utilisateur</h2>
@@ -334,6 +321,7 @@ const AdminDashboard = ({ user, onLogout }) => {
                         </form>
                     </div>
                 </div>
+                {/* Liste Users */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                     <div className="p-6 border-b border-gray-100 flex items-center justify-between">
                         <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2"><Icons.Users size={20} className="text-gray-500" /> Utilisateurs existants</h2>
@@ -344,7 +332,6 @@ const AdminDashboard = ({ user, onLogout }) => {
                             <thead className="bg-gray-50">
                                 <tr>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nom & Identifiant</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mot de passe</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rôle / Actions</th>
                                 </tr>
                             </thead>
@@ -356,7 +343,6 @@ const AdminDashboard = ({ user, onLogout }) => {
                                                 <div className="text-sm font-medium text-gray-900">{u.fullName}</div>
                                                 <div className="text-sm text-gray-500">{u.username}</div>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{u.password}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                 <div className="flex items-center gap-3">
                                                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${u.role === UserRole.ADMIN ? 'bg-purple-100 text-purple-800' : u.role === UserRole.TEACHER ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}`}>{u.role}</span>
@@ -374,7 +360,7 @@ const AdminDashboard = ({ user, onLogout }) => {
                                         {expandedTeacherId === u.id && (
                                             <tr className="bg-indigo-50/30">
                                                 <td colSpan="3" className="px-6 py-4">
-                                                    <TeacherClassManager teacherId={u.id} classes={classes} onUpdateClasses={refreshList} />
+                                                    <TeacherClassManager teacherId={u.id} classes={classes} onUpdateClasses={() => {}} />
                                                 </td>
                                             </tr>
                                         )}
@@ -389,9 +375,10 @@ const AdminDashboard = ({ user, onLogout }) => {
     );
 };
 
-// --- Dashboard Professeur ---
+// --- Dashboard Professeur (Async) ---
 const TeacherDashboard = ({ user, onLogout }) => {
     const [activeTab, setActiveTab] = useState('absences');
+    const [allClasses, setAllClasses] = useState([]);
     const [myClasses, setMyClasses] = useState([]);
     
     // New Class State
@@ -399,6 +386,7 @@ const TeacherDashboard = ({ user, onLogout }) => {
     
     // Absence Form State
     const [selectedClassId, setSelectedClassId] = useState('');
+    const [allStudents, setAllStudents] = useState([]);
     const [classStudents, setClassStudents] = useState([]);
     const [selectedStudentIds, setSelectedStudentIds] = useState(new Set());
     
@@ -407,37 +395,40 @@ const TeacherDashboard = ({ user, onLogout }) => {
     const [endTime, setEndTime] = useState('');
     const [feedbackMsg, setFeedbackMsg] = useState(null);
 
-    useEffect(() => { loadClasses(); }, [user.id]);
+    // Écoute temps réel
+    useEffect(() => {
+        const unsubClasses = onSnapshot(classesCol, (snap) => {
+            setAllClasses(snap.docs.map(d => ({id: d.id, ...d.data()})));
+        });
+        const unsubStudents = onSnapshot(studentsCol, (snap) => {
+            setAllStudents(snap.docs.map(d => ({id: d.id, ...d.data()})));
+        });
+        return () => { unsubClasses(); unsubStudents(); };
+    }, []);
+
+    useEffect(() => {
+        setMyClasses(allClasses.filter(c => c.teacherId === user.id));
+    }, [allClasses, user.id]);
 
     useEffect(() => {
         if (selectedClassId) {
-            loadStudentsForClass(selectedClassId);
+            const filtered = allStudents.filter(s => s.classId === selectedClassId);
+            filtered.sort((a, b) => a.fullName.localeCompare(b.fullName));
+            setClassStudents(filtered);
             setSelectedStudentIds(new Set());
         } else {
             setClassStudents([]);
         }
-    }, [selectedClassId]);
+    }, [selectedClassId, allStudents]);
 
-    const loadClasses = () => {
-        const allClasses = getClasses();
-        setMyClasses(allClasses.filter(c => c.teacherId === user.id));
-    };
-
-    const loadStudentsForClass = (classId) => {
-        const allStudents = getStudents();
-        const filtered = allStudents.filter(s => s.classId === classId);
-        filtered.sort((a, b) => a.fullName.localeCompare(b.fullName));
-        setClassStudents(filtered);
-    };
-
-    const handleAddClass = (e) => {
+    const handleAddClass = async (e) => {
         e.preventDefault();
         if (!newClassName.trim()) return;
-        const newClass = { id: Date.now().toString(), name: newClassName, teacherId: user.id };
-        addClass(newClass);
-        loadClasses();
-        setNewClassName('');
-        setActiveTab('absences');
+        try {
+            await addDoc(classesCol, { name: newClassName, teacherId: user.id });
+            setNewClassName('');
+            setActiveTab('absences');
+        } catch(e) { console.error(e); }
     };
 
     const toggleStudentSelection = (studentId) => {
@@ -450,7 +441,7 @@ const TeacherDashboard = ({ user, onLogout }) => {
         setSelectedStudentIds(newSelection);
     };
 
-    const handleSendAbsence = (e) => {
+    const handleSendAbsence = async (e) => {
         e.preventDefault();
         setFeedbackMsg(null);
 
@@ -470,28 +461,32 @@ const TeacherDashboard = ({ user, onLogout }) => {
         const timestamp = Date.now();
         let count = 0;
 
-        selectedStudentIds.forEach(studentId => {
-            const student = classStudents.find(s => s.id === studentId);
-            if (student) {
-                const absence = {
-                    id: `${timestamp}-${count++}`,
-                    studentName: student.fullName,
-                    date,
-                    startTime,
-                    endTime,
-                    classId: selectedClassId,
-                    className: classObj.name,
-                    teacherId: user.id,
-                    teacherName: user.fullName,
-                    timestamp: timestamp
-                };
-                addAbsence(absence);
-            }
-        });
-        
-        setSelectedStudentIds(new Set());
-        setFeedbackMsg({ type: 'success', text: `${count} absences envoyées avec succès.` });
-        setTimeout(() => setFeedbackMsg(null), 3000);
+        try {
+            const promises = Array.from(selectedStudentIds).map(studentId => {
+                const student = classStudents.find(s => s.id === studentId);
+                if (student) {
+                    const absence = {
+                        studentName: student.fullName,
+                        date,
+                        startTime,
+                        endTime,
+                        classId: selectedClassId,
+                        className: classObj.name,
+                        teacherId: user.id,
+                        teacherName: user.fullName,
+                        timestamp: timestamp + count++
+                    };
+                    return addDoc(absencesCol, absence);
+                }
+            });
+            await Promise.all(promises);
+            setSelectedStudentIds(new Set());
+            setFeedbackMsg({ type: 'success', text: `${count} absences envoyées avec succès.` });
+            setTimeout(() => setFeedbackMsg(null), 3000);
+        } catch(e) {
+            console.error(e);
+            setFeedbackMsg({ type: 'error', text: "Erreur d'envoi." });
+        }
     };
 
     return (
@@ -572,7 +567,7 @@ const TeacherDashboard = ({ user, onLogout }) => {
     );
 };
 
-// --- Dashboard Surveillant ---
+// --- Dashboard Surveillant (Async) ---
 const SupervisorDashboard = ({ user, onLogout }) => {
     const [activeTab, setActiveTab] = useState('absences');
     
@@ -583,11 +578,13 @@ const SupervisorDashboard = ({ user, onLogout }) => {
     const [filterClass, setFilterClass] = useState('');
     const [filterDate, setFilterDate] = useState('');
     const [showFilters, setShowFilters] = useState(false);
+    
+    // Data Lists
     const [teachersList, setTeachersList] = useState([]);
     const [classesList, setClassesList] = useState([]);
+    const [students, setStudents] = useState([]);
 
     // --- Student Management State ---
-    const [students, setStudents] = useState([]);
     const [selectedClassForStudent, setSelectedClassForStudent] = useState('');
     const [newStudentName, setNewStudentName] = useState('');
     const [studentSuccessMsg, setStudentSuccessMsg] = useState('');
@@ -598,21 +595,23 @@ const SupervisorDashboard = ({ user, onLogout }) => {
 
     // --- Teacher Management State ---
     const [allTeachers, setAllTeachers] = useState([]);
-    const [allClasses, setAllClasses] = useState([]);
 
-    useEffect(() => { loadData(); }, []);
+    // Écoute temps réel globale
+    useEffect(() => {
+        const unsubAbsences = onSnapshot(absencesCol, (s) => setAbsences(s.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => b.timestamp - a.timestamp)));
+        const unsubUsers = onSnapshot(usersCol, (s) => {
+            const data = s.docs.map(d => ({id: d.id, ...d.data()}));
+            const teachers = data.filter(u => u.role === UserRole.TEACHER);
+            setTeachersList(teachers);
+            setAllTeachers(teachers);
+        });
+        const unsubClasses = onSnapshot(classesCol, (s) => setClassesList(s.docs.map(d => ({id: d.id, ...d.data()}))));
+        const unsubStudents = onSnapshot(studentsCol, (s) => setStudents(s.docs.map(d => ({id: d.id, ...d.data()}))));
+
+        return () => { unsubAbsences(); unsubUsers(); unsubClasses(); unsubStudents(); };
+    }, []);
 
     useEffect(() => { applyFilters(); }, [absences, filterTeacher, filterClass, filterDate]);
-
-    const loadData = () => {
-        setAbsences(getAbsences().reverse());
-        const users = getUsers();
-        setTeachersList(users.filter(u => u.role === UserRole.TEACHER));
-        setAllTeachers(users.filter(u => u.role === UserRole.TEACHER)); // For Management Tab
-        setClassesList(getClasses());
-        setAllClasses(getClasses());
-        setStudents(getStudents());
-    };
 
     const applyFilters = () => {
         let result = absences;
@@ -621,56 +620,51 @@ const SupervisorDashboard = ({ user, onLogout }) => {
         if (filterDate) result = result.filter(a => a.date === filterDate);
         setFilteredAbsences(result);
     };
-    const handleDeleteOne = (id) => { if (window.confirm('Voulez-vous supprimer cette absence ?')) { removeAbsence(id); loadData(); } };
-    const handleClearAll = () => { if (window.confirm('ATTENTION: Voulez-vous supprimer TOUTES les absences ?')) { clearAllAbsences(); loadData(); } };
+    
+    const handleDeleteOne = async (id) => { if (window.confirm('Voulez-vous supprimer cette absence ?')) { await deleteDoc(doc(db, 'absences', id)); } };
+    
+    const handleClearAll = async () => { 
+        if (window.confirm('ATTENTION: Voulez-vous supprimer TOUTES les absences ?')) {
+            // Firestore ne supporte pas le delete de collection en une fois client-side facilement, on boucle
+            const snap = await getDocs(absencesCol);
+            snap.forEach(d => deleteDoc(d.ref));
+        } 
+    };
 
     // --- Student Management Logic ---
-    const handleAddStudent = (e) => {
+    const handleAddStudent = async (e) => {
         e.preventDefault();
         if (!selectedClassForStudent) return;
 
         if (isBulkMode) {
-            // Bulk Add Logic
             if (!bulkStudentNames.trim()) return;
-            // Split by lines
             const lines = bulkStudentNames.split('\n');
-            if (lines.length === 0) return;
-
             let count = 0;
+            const promises = [];
             lines.forEach(line => {
                 const cleanLine = line.trim();
-                if (!cleanLine) return;
-                // Handle Excel Copy (Tab separation)
-                const parts = cleanLine.split(/[\t]+/).map(p => p.trim()).filter(p => p);
-                const fullName = parts.join(' '); 
-
-                if (fullName) {
-                    const newStudent = { 
-                        id: Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9), 
-                        fullName: fullName, 
-                        classId: selectedClassForStudent 
-                    };
-                    addStudent(newStudent);
-                    count++;
+                if (cleanLine) {
+                    const parts = cleanLine.split(/[\t]+/).map(p => p.trim()).filter(p => p);
+                    const fullName = parts.join(' '); 
+                    if (fullName) {
+                        promises.push(addDoc(studentsCol, { fullName, classId: selectedClassForStudent }));
+                        count++;
+                    }
                 }
             });
-
+            await Promise.all(promises);
             setBulkStudentNames('');
             setStudentSuccessMsg(`${count} élèves ajoutés avec succès !`);
         } else {
-            // Single Add Logic
             if (!newStudentName.trim()) return;
-            const newStudent = { id: Date.now().toString(), fullName: newStudentName.trim(), classId: selectedClassForStudent };
-            addStudent(newStudent);
+            await addDoc(studentsCol, { fullName: newStudentName.trim(), classId: selectedClassForStudent });
             setNewStudentName('');
             setStudentSuccessMsg('Élève ajouté avec succès.');
         }
-        
         setTimeout(() => setStudentSuccessMsg(''), 3000);
-        loadData();
     };
 
-    const handleDeleteStudent = (id) => { if(window.confirm('Supprimer cet élève ?')) { removeStudent(id); loadData(); } };
+    const handleDeleteStudent = async (id) => { if(window.confirm('Supprimer cet élève ?')) { await deleteDoc(doc(db, 'students', id)); } };
 
     const displayedStudents = selectedClassForStudent ? students.filter(s => s.classId === selectedClassForStudent) : [];
 
@@ -678,7 +672,7 @@ const SupervisorDashboard = ({ user, onLogout }) => {
         <div className="min-h-screen bg-gray-50 flex flex-col animate-fade-in">
             <header className="bg-orange-600 text-white shadow-lg sticky top-0 z-20">
                 <div className="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
-                    <div><h1 className="text-lg font-bold">Espace Surveillant</h1><p className="text-xs text-orange-100">Gestion globale</p></div>
+                    <div><h1 className="text-lg font-bold">Espace Surveillant</h1><p className="text-xs text-orange-100">Gestion globale (Cloud)</p></div>
                     <button onClick={onLogout} className="p-2 bg-orange-700 rounded-full hover:bg-orange-800 transition-colors"><Icons.LogOut size={20} /></button>
                 </div>
             </header>
@@ -740,7 +734,7 @@ const SupervisorDashboard = ({ user, onLogout }) => {
                         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                             <div className="bg-gray-50 px-6 py-3 border-b border-gray-100"><h3 className="font-medium text-gray-700">Liste des Professeurs et leurs Classes</h3></div>
                             <div className="divide-y divide-gray-100">
-                                {allTeachers.length > 0 ? allTeachers.map(teacher => (
+                                {teachersList.length > 0 ? teachersList.map(teacher => (
                                     <div key={teacher.id} className="p-4">
                                         <div className="flex items-center justify-between mb-2">
                                             <div>
@@ -749,7 +743,7 @@ const SupervisorDashboard = ({ user, onLogout }) => {
                                             </div>
                                         </div>
                                         {/* Class Manager Component */}
-                                        <TeacherClassManager teacherId={teacher.id} classes={allClasses} onUpdateClasses={loadData} />
+                                        <TeacherClassManager teacherId={teacher.id} classes={classesList} onUpdateClasses={() => {}} />
                                     </div>
                                 )) : <div className="p-6 text-center text-gray-500">Aucun professeur enregistré.</div>}
                             </div>
@@ -835,6 +829,7 @@ const SupervisorDashboard = ({ user, onLogout }) => {
 const App = () => {
     const [currentUser, setCurrentUser] = useState(null);
 
+    // Persistance session simple via localStorage
     useEffect(() => {
         const storedUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
         if (storedUser) setCurrentUser(JSON.parse(storedUser));
