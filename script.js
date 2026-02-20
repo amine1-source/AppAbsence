@@ -775,6 +775,16 @@ const SupervisorDashboard = ({ user, onLogout }) => {
         }
     }
 
+    // Helper to get unique classes by name for the dropdown
+    const uniqueClasses = classesList.reduce((acc, current) => {
+        const x = acc.find(item => item.name.trim().toLowerCase() === current.name.trim().toLowerCase());
+        if (!x) {
+            return acc.concat([current]);
+        } else {
+            return acc;
+        }
+    }, []).sort((a, b) => a.name.localeCompare(b.name));
+
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col animate-fade-in">
             <header className="bg-orange-600 text-white shadow-lg sticky top-0 z-20">
@@ -808,7 +818,7 @@ const SupervisorDashboard = ({ user, onLogout }) => {
                                             <select value={filterTeacher} onChange={(e) => setFilterTeacher(e.target.value)} className="w-full pl-8 p-2 text-sm border border-gray-300 rounded-lg focus:ring-orange-500 bg-white"><option value="">Tous les professeurs</option>{teachersList.map(t => (<option key={t.id} value={t.fullName}>{t.fullName}</option>))}</select>
                                         </div>
                                     </div>
-                                    <div><label className="block text-xs font-semibold text-gray-500 mb-1">Classe</label><select value={filterClass} onChange={(e) => setFilterClass(e.target.value)} className="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-orange-500 bg-white"><option value="">Toutes les classes</option>{classesList.map(c => (<option key={c.id} value={c.name}>{c.name}</option>))}</select></div>
+                                    <div><label className="block text-xs font-semibold text-gray-500 mb-1">Classe</label><select value={filterClass} onChange={(e) => setFilterClass(e.target.value)} className="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-orange-500 bg-white"><option value="">Toutes les classes</option>{uniqueClasses.map(c => (<option key={c.id} value={c.name}>{c.name}</option>))}</select></div>
                                     <div><label className="block text-xs font-semibold text-gray-500 mb-1">Date</label><input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-orange-500" /></div>
                                 </div>
                             )}
@@ -877,7 +887,7 @@ const SupervisorDashboard = ({ user, onLogout }) => {
                             <form onSubmit={handleAddStudent} className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Sélectionner une classe</label>
-                                    <select value={selectedClassForStudent} onChange={(e) => setSelectedClassForStudent(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 bg-white" required><option value="">-- Choisir la classe --</option>{classesList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+                                    <select value={selectedClassForStudent} onChange={(e) => setSelectedClassForStudent(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 bg-white" required><option value="">-- Choisir la classe --</option>{uniqueClasses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
                                 </div>
                                 
                                 {isBulkMode ? (
