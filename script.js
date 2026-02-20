@@ -212,6 +212,14 @@ const TeacherClassManager = ({ teacherId, classes, onUpdateClasses }) => {
         } catch(e) { console.error(e); }
     };
 
+    const handleDeleteClass = async (id) => {
+        if (window.confirm('Voulez-vous vraiment supprimer cette classe ?')) {
+            try {
+                await deleteDoc(doc(db, 'classes', id));
+            } catch (e) { console.error(e); }
+        }
+    };
+
     return (
         <div className="mt-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
             <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Classes attribuées</h4>
@@ -228,7 +236,10 @@ const TeacherClassManager = ({ teacherId, classes, onUpdateClasses }) => {
                             ) : (
                                 <>
                                     <span className="text-sm font-medium text-gray-800">{cls.name}</span>
-                                    <button onClick={() => startEditing(cls)} className="text-blue-400 hover:text-blue-600 p-1"><Icons.Edit size={14} /></button>
+                                    <div className="flex items-center gap-1">
+                                        <button onClick={() => startEditing(cls)} className="text-blue-400 hover:text-blue-600 p-1"><Icons.Edit size={14} /></button>
+                                        <button onClick={() => handleDeleteClass(cls.id)} className="text-red-400 hover:text-red-600 p-1"><Icons.Trash2 size={14} /></button>
+                                    </div>
                                 </>
                             )}
                         </div>
@@ -420,14 +431,25 @@ const TeacherDashboard = ({ user, onLogout }) => {
 
     useEffect(() => {
         if (selectedClassId) {
-            const filtered = allStudents.filter(s => s.classId === selectedClassId);
-            filtered.sort((a, b) => a.fullName.localeCompare(b.fullName));
-            setClassStudents(filtered);
+            const selectedClass = allClasses.find(c => c.id === selectedClassId);
+            if (selectedClass) {
+                // Find all class IDs that share the same name (case-insensitive and trimmed)
+                const targetName = selectedClass.name.trim().toLowerCase();
+                const sameNameClassIds = allClasses
+                    .filter(c => c.name.trim().toLowerCase() === targetName)
+                    .map(c => c.id);
+                
+                const filtered = allStudents.filter(s => sameNameClassIds.includes(s.classId));
+                filtered.sort((a, b) => a.fullName.localeCompare(b.fullName));
+                setClassStudents(filtered);
+            } else {
+                setClassStudents([]);
+            }
             setSelectedStudentIds(new Set());
         } else {
             setClassStudents([]);
         }
-    }, [selectedClassId, allStudents]);
+    }, [selectedClassId, allStudents, allClasses]);
 
     // Check for previous absences
     useEffect(() => {
@@ -740,7 +762,18 @@ const SupervisorDashboard = ({ user, onLogout }) => {
 
     const handleDeleteStudent = async (id) => { if(window.confirm('Supprimer cet élève ?')) { await deleteDoc(doc(db, 'students', id)); } };
 
-    const displayedStudents = selectedClassForStudent ? students.filter(s => s.classId === selectedClassForStudent) : [];
+    // Logique pour afficher les étudiants de TOUTES les classes ayant le même nom
+    let displayedStudents = [];
+    if (selectedClassForStudent) {
+        const selectedClass = classesList.find(c => c.id === selectedClassForStudent);
+        if (selectedClass) {
+             const targetName = selectedClass.name.trim().toLowerCase();
+             const sameNameClassIds = classesList
+                .filter(c => c.name.trim().toLowerCase() === targetName)
+                .map(c => c.id);
+             displayedStudents = students.filter(s => sameNameClassIds.includes(s.classId));
+        }
+    }
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col animate-fade-in">
