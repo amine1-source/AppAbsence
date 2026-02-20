@@ -52,7 +52,8 @@ const Icons = {
     FileText: ({size, className}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>,
     Edit: ({size, className}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>,
     Save: ({size, className}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
-    X: ({size, className}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+    X: ({size, className}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+    AlertCircle: ({size, className}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
 };
 
 // --- 3. CONSTANTES ET SERVICES (Mise à jour pour Firebase) ---
@@ -395,6 +396,10 @@ const TeacherDashboard = ({ user, onLogout }) => {
     const [endTime, setEndTime] = useState('');
     const [feedbackMsg, setFeedbackMsg] = useState(null);
 
+    // State for previous absences
+    const [allAbsences, setAllAbsences] = useState([]);
+    const [previouslyAbsentStudentIds, setPreviouslyAbsentStudentIds] = useState(new Set());
+
     // Écoute temps réel
     useEffect(() => {
         const unsubClasses = onSnapshot(classesCol, (snap) => {
@@ -403,7 +408,10 @@ const TeacherDashboard = ({ user, onLogout }) => {
         const unsubStudents = onSnapshot(studentsCol, (snap) => {
             setAllStudents(snap.docs.map(d => ({id: d.id, ...d.data()})));
         });
-        return () => { unsubClasses(); unsubStudents(); };
+        const unsubAbsences = onSnapshot(absencesCol, (snap) => {
+            setAllAbsences(snap.docs.map(d => ({id: d.id, ...d.data()})));
+        });
+        return () => { unsubClasses(); unsubStudents(); unsubAbsences(); };
     }, []);
 
     useEffect(() => {
@@ -420,6 +428,32 @@ const TeacherDashboard = ({ user, onLogout }) => {
             setClassStudents([]);
         }
     }, [selectedClassId, allStudents]);
+
+    // Check for previous absences
+    useEffect(() => {
+        if (selectedClassId && date && startTime) {
+            const currentStartHour = parseInt(startTime.split(':')[0], 10);
+            
+            const previousAbsences = allAbsences.filter(absence => {
+                if (absence.date !== date) return false;
+                const absenceEndHour = parseInt(absence.endTime.split(':')[0], 10);
+                return absenceEndHour === currentStartHour;
+            });
+
+            const absentStudentNames = new Set(previousAbsences.map(a => a.studentName));
+            
+            const absentIds = new Set();
+            classStudents.forEach(student => {
+                if (absentStudentNames.has(student.fullName)) {
+                    absentIds.add(student.id);
+                }
+            });
+
+            setPreviouslyAbsentStudentIds(absentIds);
+        } else {
+            setPreviouslyAbsentStudentIds(new Set());
+        }
+    }, [selectedClassId, date, startTime, allAbsences, classStudents]);
 
     const handleAddClass = async (e) => {
         e.preventDefault();
@@ -550,10 +584,32 @@ const TeacherDashboard = ({ user, onLogout }) => {
                                                 <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto p-2 bg-gray-50 rounded-lg border border-gray-200">
                                                     {classStudents.map(student => {
                                                         const isSelected = selectedStudentIds.has(student.id);
+                                                        const wasAbsentPreviously = previouslyAbsentStudentIds.has(student.id);
                                                         return (
-                                                            <div key={student.id} onClick={() => toggleStudentSelection(student.id)} className={`flex items-center p-3 rounded-lg cursor-pointer transition-colors ${isSelected ? 'bg-red-50 border border-red-200' : 'bg-white border border-transparent hover:bg-gray-100'}`}>
-                                                                <div className={`mr-3 ${isSelected ? 'text-red-600' : 'text-gray-400'}`}>{isSelected ? <Icons.CheckSquare size={20} /> : <Icons.Square size={20} />}</div>
-                                                                <span className={`text-sm font-medium ${isSelected ? 'text-red-800' : 'text-gray-700'}`}>{student.fullName}</span>
+                                                            <div 
+                                                                key={student.id} 
+                                                                onClick={() => toggleStudentSelection(student.id)} 
+                                                                className={`flex items-center p-3 rounded-lg cursor-pointer transition-colors ${
+                                                                    isSelected 
+                                                                        ? 'bg-red-50 border border-red-200' 
+                                                                        : wasAbsentPreviously 
+                                                                            ? 'bg-yellow-50 border border-yellow-200' 
+                                                                            : 'bg-white border border-transparent hover:bg-gray-100'
+                                                                }`}
+                                                            >
+                                                                <div className={`mr-3 ${isSelected ? 'text-red-600' : wasAbsentPreviously ? 'text-yellow-600' : 'text-gray-400'}`}>
+                                                                    {isSelected ? <Icons.CheckSquare size={20} /> : wasAbsentPreviously ? <Icons.AlertCircle size={20} /> : <Icons.Square size={20} />}
+                                                                </div>
+                                                                <div className="flex-1">
+                                                                    <span className={`text-sm font-medium ${isSelected ? 'text-red-800' : 'text-gray-700'}`}>
+                                                                        {student.fullName}
+                                                                    </span>
+                                                                    {wasAbsentPreviously && (
+                                                                        <span className="ml-2 text-xs text-yellow-700 bg-yellow-100 px-2 py-0.5 rounded-full">
+                                                                            Absent au cours précédent
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         );
                                                     })}
