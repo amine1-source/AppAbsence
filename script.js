@@ -522,8 +522,26 @@ const TeacherDashboard = ({ user, onLogout }) => {
                                         <div><label className="block text-sm font-medium text-gray-700 mb-1">Date</label><div className="relative"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Icons.Calendar size={18} className="text-gray-400" /></div><input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="block w-full pl-10 border-gray-300 rounded-lg shadow-sm p-3 border" /></div></div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
-                                        <div><label className="block text-sm font-medium text-gray-700 mb-1">De</label><input type="time" required value={startTime} onChange={(e) => setStartTime(e.target.value)} className="block w-full border-gray-300 rounded-lg shadow-sm p-3 border" /></div>
-                                        <div><label className="block text-sm font-medium text-gray-700 mb-1">À</label><input type="time" required value={endTime} onChange={(e) => setEndTime(e.target.value)} className="block w-full border-gray-300 rounded-lg shadow-sm p-3 border" /></div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">De</label>
+                                            <select required value={startTime} onChange={(e) => setStartTime(e.target.value)} className="block w-full border-gray-300 rounded-lg shadow-sm p-3 border bg-white">
+                                                <option value="">-- Heure --</option>
+                                                {Array.from({ length: 14 }, (_, i) => i + 7).map(h => {
+                                                    const hour = h.toString().padStart(2, '0');
+                                                    return <option key={hour} value={`${hour}:00`}>{`${hour}:00`}</option>;
+                                                })}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">À</label>
+                                            <select required value={endTime} onChange={(e) => setEndTime(e.target.value)} className="block w-full border-gray-300 rounded-lg shadow-sm p-3 border bg-white">
+                                                <option value="">-- Heure --</option>
+                                                {Array.from({ length: 14 }, (_, i) => i + 7).map(h => {
+                                                    const hour = h.toString().padStart(2, '0');
+                                                    return <option key={hour} value={`${hour}:00`}>{`${hour}:00`}</option>;
+                                                })}
+                                            </select>
+                                        </div>
                                     </div>
                                     <div className="border-t border-gray-200 pt-4">
                                         <label className="block text-sm font-medium text-gray-700 mb-3">Cochez les élèves absents :</label>
